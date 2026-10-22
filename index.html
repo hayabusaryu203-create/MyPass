@@ -1,0 +1,257 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<title>MaPass</title>
+<style>
+  :root {
+    --bg: #f4f5f7; --card: #ffffff; --text: #1b1d22; --muted: #6b7080; --line: #dfe2e8;
+    --dot: #b9bfcc; --accent: #3b6ef5; --ok: #1f9d55; --bad: #d64545; --warn: #c98a00;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #111318; --card: #1b1e25; --text: #eceef3; --muted: #9399a8; --line: #2c313b;
+      --dot: #4a5060; --accent: #6b93ff; --ok: #3cc47c; --bad: #ff6b6b; --warn: #f0b429;
+    }
+  }
+  * { box-sizing: border-box; }
+  html, body { overflow-y: auto; }
+  body { margin: 0; background: var(--bg); color: var(--text);
+    font: 15px/1.4 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+  main { max-width: 1120px; margin: 0 auto; padding: 16px 16px 40px; }
+  h1 { font-size: 22px; margin: 0; }
+  h2 { font-size: 17px; margin: 0; }
+  .muted { color: var(--muted); }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 16px; margin-bottom: 16px; }
+  .narrow { max-width: 420px; margin: 40px auto; }
+
+  .top { display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 12px; }
+  .who { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+  .tabs { display: flex; gap: 6px; margin-bottom: 16px; border-bottom: 1px solid var(--line); overflow-x: auto; }
+  .tab { border: 0; border-bottom: 3px solid transparent; border-radius: 0; background: none; padding: 10px 14px; font-weight: 600; color: var(--muted); }
+  .tab.active { color: var(--text); border-bottom-color: var(--accent); }
+  .badge { display: inline-block; min-width: 20px; padding: 1px 6px; border-radius: 10px; background: var(--bad); color: #fff; font-size: 12px; text-align: center; }
+  .badge[hidden] { display: none; }
+
+  .two-col { display: block; }
+  @media (min-width: 860px) {
+    .two-col { display: grid; grid-template-columns: 380px 1fr; gap: 16px; align-items: start; }
+    .pad-card { position: sticky; top: 16px; }
+  }
+
+  .pad { display: block; width: 100%; max-width: min(300px, 70vw); margin: 10px auto 0; touch-action: none; user-select: none; cursor: crosshair; }
+  .status { text-align: center; font-weight: 600; min-height: 44px; margin: 10px 0; padding: 10px; border-radius: 10px; }
+  .msg { font-weight: 600; margin: 8px 0; }
+  .status.ok, .msg.ok { background: color-mix(in srgb, var(--ok) 15%, transparent); color: var(--ok); }
+  .status.bad, .msg.bad { background: color-mix(in srgb, var(--bad) 15%, transparent); color: var(--bad); }
+  .status.warn, .msg.warn { background: color-mix(in srgb, var(--warn) 15%, transparent); color: var(--warn); }
+  .msg.ok, .msg.bad, .msg.warn { padding: 8px 10px; border-radius: 8px; }
+  .seq { text-align: center; color: var(--muted); font-family: ui-monospace, Consolas, monospace; min-height: 20px; }
+  .actions, .tools { display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; margin-top: 10px; }
+
+  button { font: inherit; border: 1px solid var(--line); background: var(--card); color: var(--text);
+    padding: 10px 14px; border-radius: 10px; cursor: pointer; }
+  button:disabled { opacity: .4; cursor: not-allowed; }
+  button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+  button.good { background: var(--ok); border-color: var(--ok); color: #fff; }
+  button.danger { background: var(--bad); border-color: var(--bad); color: #fff; }
+  button.small { padding: 6px 10px; font-size: 13px; }
+  button.link { border: 0; background: none; color: var(--accent); padding: 4px; }
+  input, select { font: inherit; width: 100%; padding: 10px 12px; border: 1px solid var(--line); border-radius: 10px;
+    background: var(--bg); color: var(--text); margin-top: 4px; }
+  label { display: block; margin-bottom: 12px; font-size: 14px; color: var(--muted); }
+  form .primary { width: 100%; }
+  .row { display: flex; gap: 8px; }
+  .row input { margin: 0; }
+  .row button { width: auto; white-space: nowrap; }
+
+  .hist-head { display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap; }
+  .hist-head .tools { margin: 0; }
+  .hint { color: var(--muted); font-size: 13px; margin: 6px 0 0; }
+  .tip { color: var(--muted); font-size: 13px; margin: 14px 0 0; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(110px, 1fr)); gap: 10px; margin-top: 14px; }
+  .item { border: 1px solid var(--line); border-radius: 10px; padding: 8px; text-align: center; position: relative;
+    background: var(--card); cursor: grab; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none;
+    transition: transform .15s; }
+  .item.static { cursor: default; }
+  .item.hit { outline: 3px solid var(--bad); }
+  .item.win { outline: 3px solid var(--ok); }
+  .item.pressing { transform: scale(.95); }
+  .item.dragging { position: fixed; z-index: 10; pointer-events: none; cursor: grabbing; transform: scale(1.06);
+    box-shadow: 0 10px 30px rgba(0,0,0,.25); }
+  .item.placeholder { border: 2px dashed var(--accent); background: color-mix(in srgb, var(--accent) 8%, transparent); }
+  .item svg { width: 100%; max-width: 90px; }
+  .item .n { font-weight: 700; font-size: 13px; }
+  .meta { color: var(--muted); font-size: 11px; font-family: ui-monospace, Consolas, monospace; word-break: break-all; }
+  .item .del { position: absolute; top: 2px; right: 4px; border: 0; background: none; color: var(--muted); padding: 2px 6px; font-size: 14px; }
+  .empty { color: var(--muted); text-align: center; padding: 20px 0; grid-column: 1 / -1; }
+
+  .req-head { display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap; }
+  .sugs { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 12px; margin-top: 14px; }
+  .sug { border: 2px solid var(--line); border-radius: 12px; padding: 12px; text-align: center; }
+  .sug.pending { border-color: var(--accent); }
+  .sug.win { border-color: var(--ok); }
+  .sug.fail { opacity: .7; }
+  .sug svg { width: 100%; max-width: 180px; }
+  .sug .actions { margin-top: 8px; }
+  .sug .actions button { flex: 1; }
+  .res { font-weight: 700; margin-top: 6px; }
+  .chips { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 12px; }
+  .chips button.active { border-color: var(--accent); color: var(--accent); font-weight: 600; }
+  .list { list-style: none; padding: 0; margin: 12px 0 0; }
+  .list li { display: flex; justify-content: space-between; align-items: center; gap: 8px; padding: 10px 0; border-top: 1px solid var(--line); }
+  .banner { display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap; border-color: var(--accent); }
+  #toast { position: fixed; left: 50%; bottom: 20px; transform: translateX(-50%); max-width: calc(100% - 32px);
+    background: var(--text); color: var(--bg); padding: 12px 16px; border-radius: 12px; font-weight: 600; z-index: 20;
+    box-shadow: 0 8px 24px rgba(0,0,0,.25); }
+  [hidden] { display: none !important; }
+</style>
+</head>
+<body>
+<main>
+  <div id="setup" class="card narrow" hidden>
+    <h1>MaPass</h1>
+    <p>Falta configurar o Supabase: preencha <code>config.js</code> com a URL e a chave anon do seu projeto. O passo a passo está no README.md.</p>
+  </div>
+
+  <section id="auth" class="card narrow" hidden>
+    <h1>MaPass</h1>
+    <p class="muted">Lembra quais padrões você já tentou e deixa alguém te ajudar a descobrir o seu.</p>
+    <form id="authForm">
+      <label id="nameRow" hidden>Seu nome<input id="name" autocomplete="name" placeholder="Como seus contatos vão te ver"></label>
+      <label>E-mail<input id="email" type="email" required autocomplete="email"></label>
+      <label>Senha<input id="password" type="password" required minlength="6" autocomplete="current-password"></label>
+      <button id="authSubmit" class="primary">Entrar</button>
+    </form>
+    <div id="authMsg" class="msg"></div>
+    <button id="authToggle" class="link">Não tem conta? Criar uma</button>
+  </section>
+
+  <div id="app" hidden>
+    <header class="top">
+      <h1>MaPass</h1>
+      <div class="who">
+        <span class="muted" id="meName"></span>
+        <button id="btnBell" class="small" hidden>🔔 Ativar avisos</button>
+        <button id="btnLogout" class="small">Sair</button>
+      </div>
+    </header>
+
+    <nav class="tabs">
+      <button class="tab active" data-tab="tentar">Tentar</button>
+      <button class="tab" data-tab="socorro">Socorro <span id="sosBadge" class="badge" hidden></span></button>
+      <button class="tab" data-tab="contatos">Contatos</button>
+    </nav>
+
+    <div id="localBanner" class="card banner" hidden>
+      <span>Encontrei <b id="localCount"></b> padrão(ões) salvos neste navegador. Quer levar pra sua conta?</span>
+      <span class="tools">
+        <button class="small primary" id="btnLocalImport">Importar</button>
+        <button class="small" id="btnLocalSkip">Ignorar</button>
+      </span>
+    </div>
+
+    <!-- ---------- Tentar ---------- -->
+    <section data-panel="tentar" class="two-col">
+      <div class="card pad-card">
+        <h2>Desenhe o padrão que vai tentar</h2>
+        <svg id="pad" class="pad" viewBox="0 0 300 300"></svg>
+        <div class="seq" id="seq"></div>
+        <div class="status" id="status">Desenhe um padrão</div>
+        <div class="actions">
+          <button id="btnFail" class="primary" disabled>Tentei e não deu ✗</button>
+          <button id="btnWin" class="good" disabled>Funcionou! ✓</button>
+          <button id="btnClear">Limpar</button>
+        </div>
+        <p class="tip">Os pontos são numerados assim: 1 2 3 / 4 5 6 / 7 8 9, e o ponto verde é o início. Igual ao Android,
+          passar por cima de um ponto do meio (ex.: de 1 para 3) inclui ele automaticamente, e o mínimo são 4 pontos.
+          A direção importa: 1→2→3→6 é diferente de 6→3→2→1.</p>
+      </div>
+
+      <div class="card">
+        <div class="hist-head">
+          <h2>Já tentados: <span id="count">0</span></h2>
+          <div class="tools">
+            <button class="small" id="btnChrono">Ordem das tentativas</button>
+            <button class="small" id="btnExport">Exportar</button>
+            <button class="small" id="btnImport">Importar</button>
+            <input type="file" id="fileIn" accept="application/json,.json" hidden>
+          </div>
+        </div>
+        <p class="hint">Arraste os padrões para agrupar os parecidos. No celular, segure um pouquinho antes de arrastar.</p>
+        <div id="hist" class="grid"></div>
+      </div>
+    </section>
+
+    <!-- ---------- Socorro ---------- -->
+    <section data-panel="socorro" hidden>
+      <div class="card" id="askCard">
+        <h2>Esqueceu o padrão?</h2>
+        <p class="muted">Peça ajuda pra um contato: a pessoa desenha o padrão que acha que é e te manda, você testa no celular e responde se deu certo.</p>
+        <form id="askForm">
+          <label>Pedir para<select id="helperSelect"></select></label>
+          <label>Mensagem (opcional)<input id="askMsg" maxlength="200" placeholder="Ex.: acho que começava no canto de cima"></label>
+          <button class="primary">Pedir socorro 🆘</button>
+        </form>
+        <p id="askEmpty" class="muted" hidden>Adicione um contato na aba Contatos primeiro.</p>
+      </div>
+
+      <div id="myReqs"></div>
+
+      <div id="incoming" hidden>
+        <div class="chips" id="helpChips"></div>
+        <div class="two-col">
+          <div class="card pad-card">
+            <h2 id="helpTitle"></h2>
+            <p class="muted" id="helpMsg"></p>
+            <svg id="helpPad" class="pad" viewBox="0 0 300 300"></svg>
+            <div class="seq" id="helpSeq"></div>
+            <div class="status" id="helpStatus">Desenhe o padrão que você acha que é</div>
+            <div class="actions">
+              <button id="btnSend" class="primary" disabled>Enviar</button>
+              <button id="btnHelpClear">Limpar</button>
+            </div>
+          </div>
+          <div>
+            <div class="card">
+              <h2>O que você já mandou</h2>
+              <div id="helpSugs" class="grid"></div>
+            </div>
+            <div class="card">
+              <h2 id="helpTriedTitle"></h2>
+              <div id="helpTried" class="grid"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card" id="pastCard" hidden>
+        <h2>Pedidos anteriores</h2>
+        <ul class="list" id="pastReqs"></ul>
+      </div>
+    </section>
+
+    <!-- ---------- Contatos ---------- -->
+    <section data-panel="contatos" hidden>
+      <div class="card">
+        <h2>Contatos</h2>
+        <p class="muted">Adicione pelo e-mail da conta da pessoa (ela precisa ter criado uma conta no MaPass). O contato vale pros dois lados.</p>
+        <form id="contactForm" class="row">
+          <input id="contactEmail" type="email" required placeholder="email@exemplo.com">
+          <button class="primary">Adicionar</button>
+        </form>
+        <div id="contactMsg" class="msg"></div>
+        <ul class="list" id="contactList"></ul>
+      </div>
+    </section>
+  </div>
+</main>
+
+<div id="toast" hidden></div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
+<script src="config.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
